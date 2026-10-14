@@ -143,9 +143,11 @@ export function useP2PSync({
         if (err) setErrorMessage(err);
         else if (newStatus === 'connected') setErrorMessage(null);
       },
-      onPeerConnected: (info) => {
+      onPeerConnected: async (info) => {
         setPeerInfo(info);
-        // Handshake
+        console.log('[SmokePulse P2P] Connected to remote peer, exchanging handshake...');
+
+        // 1. Handshake
         peerService.send({
           type: 'HELLO',
           deviceId: 'sp_device',
@@ -153,11 +155,23 @@ export function useP2PSync({
           appVersion: 3,
           timestamp: Date.now(),
         });
-        // Delta sync
+
+        // 2. Request remote data
         peerService.send({
           type: 'SYNC_REQUEST',
           sinceTimestamp: 0,
         });
+
+        // 3. Send local payload
+        try {
+          const localPayload = await storageManager.generateSyncPayload(0);
+          peerService.send({
+            type: 'SYNC_PAYLOAD',
+            payload: localPayload,
+          });
+        } catch (err) {
+          console.warn('[SmokePulse P2P] Initial sync dispatch error:', err);
+        }
       },
       onPeerDisconnected: () => {
         setPeerInfo(null);
