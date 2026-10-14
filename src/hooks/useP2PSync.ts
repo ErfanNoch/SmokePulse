@@ -3,7 +3,7 @@ import { P2PConnectionStatus, P2PPeerInfo, P2PMessage } from '../lib/p2p/types';
 import { peerService } from '../lib/p2p/peerService';
 import { storageManager } from '../lib/storage';
 import { CRDTEngine } from '../lib/crdt';
-import { CigaretteLog, PackPurchase, UserProfile, SyncPayload } from '../types';
+import { CigaretteLog, PackPurchase, UserProfile } from '../types';
 
 interface UseP2PSyncOptions {
   activeProfile: UserProfile;
@@ -37,37 +37,65 @@ export function useP2PSync({
   profilesRef.current = profiles;
   const activeProfileRef = useRef(activeProfile);
   activeProfileRef.current = activeProfile;
+  const onDataMergedRef = useRef(onDataMerged);
+  onDataMergedRef.current = onDataMerged;
+
+  // Overload & concurrency locks
+  const isSyncInProgressRef = useRef(false);
+  const lastSyncRequestTimeRef = useRef(0);
+  const lastSyncNowTimeRef = useRef(0);
 
   // Message handler
   const handleMessage = useCallback(
     async (msg: P2PMessage) => {
+      if (!msg || typeof msg !== 'object' || !msg.type) return;
+
       switch (msg.type) {
         case 'SYNC_REQUEST': {
-          // Sync request
-          const payload = await storageManager.generateSyncPayload(msg.sinceTimestamp || 0);
-          peerService.send({
-            type: 'SYNC_PAYLOAD',
-            payload,
-          });
+          // Rate-limit incoming sync requests to at most 1 every 2 seconds
+          const now = Date.now();
+          if (now - lastSyncRequestTimeRef.current < 2000) {
+            console.log('[SmokePulse P2P] Debouncing rapid SYNC_REQUEST');
+            return;
+          }
+          lastSyncRequestTimeRef.current = now;
+
+          try {
+            const payload = await storageManager.generateSyncPayload(msg.sinceTimestamp || 0);
+            peerService.send({
+              type: 'SYNC_PAYLOAD',
+              payload,
+            });
+          } catch (err) {
+            console.warn('[SmokePulse P2P] Failed to generate sync payload:', err);
+          }
           break;
         }
 
         case 'SYNC_PAYLOAD': {
+          // Lock to prevent overlapping concurrent IndexedDB writes
+          if (isSyncInProgressRef.current) {
+            console.log('[SmokePulse P2P] Sync already in progress, queuing or ignoring burst');
+            return;
+          }
+          isSyncInProgressRef.current = true;
           setIsSyncing(true);
+
           try {
-            // CRDT merge
             const currentData = {
               profiles: profilesRef.current,
               logs: logsRef.current,
               packs: packsRef.current,
             };
+
+            // Sanitized CRDT merge
             const result = CRDTEngine.mergePayload(currentData, msg.payload);
 
             // Persist
             await storageManager.saveAll(result.mergedProfiles, result.mergedLogs, result.mergedPacks);
 
             // UI update
-            onDataMerged({
+            onDataMergedRef.current({
               profiles: result.mergedProfiles,
               logs: result.mergedLogs,
               packs: result.mergedPacks,
@@ -79,15 +107,17 @@ export function useP2PSync({
               packsSynced: result.stats.packsAdded + result.stats.packsUpdated,
             });
 
-            // Ack
+            // Ack with count
+            const totalItems = (msg.payload?.logs?.length || 0) + (msg.payload?.packs?.length || 0);
             peerService.send({
               type: 'SYNC_ACK',
-              itemsReceived: (msg.payload.logs?.length || 0) + (msg.payload.packs?.length || 0),
+              itemsReceived: totalItems,
               timestamp: Date.now(),
             });
           } catch (err: any) {
-            console.warn('Sync merge failed:', err);
+            console.warn('[SmokePulse P2P] Sync merge error:', err);
           } finally {
+            isSyncInProgressRef.current = false;
             setIsSyncing(false);
           }
           break;
@@ -96,16 +126,17 @@ export function useP2PSync({
         case 'SYNC_ACK': {
           setLastSyncTime(Date.now());
           setIsSyncing(false);
+          isSyncInProgressRef.current = false;
           break;
         }
 
         case 'LIVE_LOG': {
-          // Live log
+          if (!msg.log || typeof msg.log !== 'object' || !msg.log.id) return;
           const currentLogs = logsRef.current;
           const { merged, added, updated } = CRDTEngine.mergeLogs(currentLogs, [msg.log]);
           if (added > 0 || updated > 0) {
             await storageManager.saveAll(profilesRef.current, merged, packsRef.current);
-            onDataMerged({
+            onDataMergedRef.current({
               profiles: profilesRef.current,
               logs: merged,
               packs: packsRef.current,
@@ -116,12 +147,12 @@ export function useP2PSync({
         }
 
         case 'LIVE_PACK': {
-          // Live pack
+          if (!msg.pack || typeof msg.pack !== 'object' || !msg.pack.id) return;
           const currentPacks = packsRef.current;
           const { merged, added, updated } = CRDTEngine.mergePacks(currentPacks, [msg.pack]);
           if (added > 0 || updated > 0) {
             await storageManager.saveAll(profilesRef.current, logsRef.current, merged);
-            onDataMerged({
+            onDataMergedRef.current({
               profiles: profilesRef.current,
               logs: logsRef.current,
               packs: merged,
@@ -132,7 +163,7 @@ export function useP2PSync({
         }
       }
     },
-    [onDataMerged]
+    []
   );
 
   // Callbacks
@@ -143,11 +174,11 @@ export function useP2PSync({
         if (err) setErrorMessage(err);
         else if (newStatus === 'connected') setErrorMessage(null);
       },
-      onPeerConnected: async (info) => {
+      onPeerConnected: (info) => {
         setPeerInfo(info);
-        console.log('[SmokePulse P2P] Connected to remote peer, exchanging handshake...');
+        console.log('[SmokePulse P2P] Peer connection active, establishing handshake...');
 
-        // 1. Handshake
+        // 1. Send HELLO
         peerService.send({
           type: 'HELLO',
           deviceId: 'sp_device',
@@ -156,25 +187,16 @@ export function useP2PSync({
           timestamp: Date.now(),
         });
 
-        // 2. Request remote data
+        // 2. Request initial sync delta
         peerService.send({
           type: 'SYNC_REQUEST',
           sinceTimestamp: 0,
         });
-
-        // 3. Send local payload
-        try {
-          const localPayload = await storageManager.generateSyncPayload(0);
-          peerService.send({
-            type: 'SYNC_PAYLOAD',
-            payload: localPayload,
-          });
-        } catch (err) {
-          console.warn('[SmokePulse P2P] Initial sync dispatch error:', err);
-        }
       },
       onPeerDisconnected: () => {
         setPeerInfo(null);
+        setIsSyncing(false);
+        isSyncInProgressRef.current = false;
       },
       onMessage: handleMessage,
     });
@@ -200,21 +222,36 @@ export function useP2PSync({
       await peerService.connectToPeer(code);
       setPairingCode(code.toUpperCase());
     } catch (err: any) {
+      console.warn('[SmokePulse P2P] Connection failed:', err);
       setErrorMessage(err?.message || 'Could not find or connect to peer');
     }
   }, []);
 
   const syncNow = useCallback(async () => {
     if (!peerService.isConnected()) return;
+
+    // Throttle user trigger to at most once per 3s
+    const now = Date.now();
+    if (now - lastSyncNowTimeRef.current < 3000) {
+      return;
+    }
+    lastSyncNowTimeRef.current = now;
+
     setIsSyncing(true);
     try {
+      // Send both a fresh request and our payload
+      peerService.send({
+        type: 'SYNC_REQUEST',
+        sinceTimestamp: 0,
+      });
+
       const payload = await storageManager.generateSyncPayload(0);
       peerService.send({
         type: 'SYNC_PAYLOAD',
         payload,
       });
     } catch (err: any) {
-      console.warn('Failed to dispatch sync payload:', err);
+      console.warn('[SmokePulse P2P] syncNow error:', err);
       setIsSyncing(false);
     }
   }, []);
@@ -243,6 +280,8 @@ export function useP2PSync({
     setPairingCode('');
     setPeerInfo(null);
     setErrorMessage(null);
+    setIsSyncing(false);
+    isSyncInProgressRef.current = false;
   }, []);
 
   return {

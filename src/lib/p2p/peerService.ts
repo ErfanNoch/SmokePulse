@@ -23,6 +23,12 @@ export class PeerService {
   private myPeerId: string = '';
   private remotePeerInfo: P2PPeerInfo | null = null;
   private pingInterval: any = null;
+  private lastPongReceivedTime: number = 0;
+
+  // Rate-limiting / DoS guard
+  private messageCountWindow: number = 0;
+  private messageWindowResetTimer: any = null;
+  private static readonly MAX_MESSAGES_PER_SEC = 25;
 
   public setCallbacks(callbacks: PeerServiceCallbacks) {
     this.callbacks = callbacks;
@@ -161,7 +167,6 @@ export class PeerService {
           this.myPeerId = myId;
           console.log('[SmokePulse P2P] Joiner Peer registered with local ID:', myId);
 
-          // Initiate data channel connection
           const conn = peer.connect(cleanId);
 
           conn.on('open', () => {
@@ -217,6 +222,7 @@ export class PeerService {
 
     conn.on('open', () => {
       console.log('[SmokePulse P2P] DataChannel established with:', conn.peer);
+      this.lastPongReceivedTime = Date.now();
 
       this.remotePeerInfo = {
         id: conn.peer,
@@ -228,13 +234,20 @@ export class PeerService {
       this.callbacks?.onStatusChange('connected');
       this.callbacks?.onPeerConnected(this.remotePeerInfo);
 
-      // Heartbeat
+      // Steady heartbeat (every 30s)
       this.startHeartbeat();
     });
 
     conn.on('data', (data: any) => {
+      // Rate limiting guard
+      if (this.isIncomingRateLimited()) {
+        console.warn('[SmokePulse P2P] Rate limit exceeded, dropping packet');
+        return;
+      }
+
       try {
         const msg = data as P2PMessage;
+        if (!msg || typeof msg !== 'object' || !msg.type) return;
 
         if (msg.type === 'PING') {
           this.send({ type: 'PONG', timestamp: msg.timestamp });
@@ -242,8 +255,9 @@ export class PeerService {
         }
 
         if (msg.type === 'PONG') {
-          if (this.remotePeerInfo) {
-            this.remotePeerInfo.lastPingMs = Date.now() - msg.timestamp;
+          this.lastPongReceivedTime = Date.now();
+          if (this.remotePeerInfo && typeof msg.timestamp === 'number') {
+            this.remotePeerInfo.lastPingMs = Math.max(1, Date.now() - msg.timestamp);
           }
           return;
         }
@@ -251,7 +265,7 @@ export class PeerService {
         if (msg.type === 'HELLO') {
           console.log('[SmokePulse P2P] Received HELLO from:', msg.deviceName);
           if (this.remotePeerInfo) {
-            this.remotePeerInfo.name = msg.deviceName || 'Peer Device';
+            this.remotePeerInfo.name = String(msg.deviceName || 'Peer Device').slice(0, 50);
           }
           this.send({
             type: 'HELLO_ACK',
@@ -265,7 +279,7 @@ export class PeerService {
         if (msg.type === 'HELLO_ACK') {
           console.log('[SmokePulse P2P] Received HELLO_ACK from:', msg.deviceName);
           if (this.remotePeerInfo) {
-            this.remotePeerInfo.name = msg.deviceName || 'Peer Device';
+            this.remotePeerInfo.name = String(msg.deviceName || 'Peer Device').slice(0, 50);
           }
           return;
         }
@@ -291,7 +305,6 @@ export class PeerService {
     const pc = (conn as any).peerConnection as RTCPeerConnection | undefined;
     if (pc) {
       pc.oniceconnectionstatechange = () => {
-        console.log('[SmokePulse P2P] ICE state changed to:', pc.iceConnectionState);
         if (pc.iceConnectionState === 'failed') {
           this.callbacks?.onStatusChange('error', 'Direct peer connection failed (NAT/Firewall).');
           this.handleDisconnect();
@@ -300,19 +313,43 @@ export class PeerService {
     }
   }
 
+  private isIncomingRateLimited(): boolean {
+    this.messageCountWindow++;
+    if (!this.messageWindowResetTimer) {
+      this.messageWindowResetTimer = setTimeout(() => {
+        this.messageCountWindow = 0;
+        this.messageWindowResetTimer = null;
+      }, 1000);
+    }
+    return this.messageCountWindow > PeerService.MAX_MESSAGES_PER_SEC;
+  }
+
   private startHeartbeat() {
     this.stopHeartbeat();
+    this.lastPongReceivedTime = Date.now();
+
+    // Heartbeat every 25 seconds (steady, no flickering or rapid polling)
     this.pingInterval = setInterval(() => {
       if (this.isConnected()) {
+        // Zombie peer check: if no pong response in 65s, disconnect cleanly
+        if (this.lastPongReceivedTime > 0 && Date.now() - this.lastPongReceivedTime > 65000) {
+          console.warn('[SmokePulse P2P] Heartbeat lost with peer, closing...');
+          this.handleDisconnect();
+          return;
+        }
         this.send({ type: 'PING', timestamp: Date.now() });
       }
-    }, 12000);
+    }, 25000);
   }
 
   private stopHeartbeat() {
     if (this.pingInterval) {
       clearInterval(this.pingInterval);
       this.pingInterval = null;
+    }
+    if (this.messageWindowResetTimer) {
+      clearTimeout(this.messageWindowResetTimer);
+      this.messageWindowResetTimer = null;
     }
   }
 

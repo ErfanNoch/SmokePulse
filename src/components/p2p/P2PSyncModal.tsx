@@ -120,12 +120,12 @@ export const P2PSyncModal: React.FC<P2PSyncModalProps> = ({
               <div className="space-y-4">
                 <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/60 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="relative">
-                      <div className="w-3 h-3 rounded-full bg-emerald-500 animate-ping absolute inset-0" />
-                      <div className="w-3 h-3 rounded-full bg-emerald-500 relative" />
+                    <div className="relative flex items-center justify-center w-3 h-3">
+                      <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                      <div className="w-2.5 h-2.5 rounded-full bg-emerald-400/40 absolute blur-[2px]" />
                     </div>
                     <div>
-                      <div className="text-xs font-semibold text-emerald-900 dark:text-emerald-200">
+                      <div className="text-xs font-semibold text-emerald-950 dark:text-emerald-200">
                         Connected: {peerInfo?.name || 'Remote Peer'}
                       </div>
                       <div className="text-[10px] font-mono text-emerald-700 dark:text-emerald-400">
@@ -134,8 +134,8 @@ export const P2PSyncModal: React.FC<P2PSyncModalProps> = ({
                     </div>
                   </div>
                   {peerInfo?.lastPingMs !== undefined && peerInfo.lastPingMs > 0 && (
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white dark:bg-neutral-900 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700">
-                      {peerInfo.lastPingMs}ms ping
+                    <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
+                      {peerInfo.lastPingMs}ms
                     </span>
                   )}
                 </div>

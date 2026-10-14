@@ -58,16 +58,21 @@ export default function App() {
   const [isP2PModalOpen, setIsP2PModalOpen] = useState(false);
 
   // P2P sync
+  const handleDataMerged = useCallback(
+    ({ profiles: p, logs: l, packs: pk }: { profiles: UserProfile[]; logs: CigaretteLog[]; packs: PackPurchase[] }) => {
+      setProfiles(p);
+      setLogs(l);
+      setPacks(pk);
+    },
+    []
+  );
+
   const p2p = useP2PSync({
     activeProfile,
     profiles,
     logs,
     packs,
-    onDataMerged: ({ profiles: p, logs: l, packs: pk }) => {
-      setProfiles(p);
-      setLogs(l);
-      setPacks(pk);
-    },
+    onDataMerged: handleDataMerged,
   });
 
   // URL pairing
