@@ -40,7 +40,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
         return stored;
       }
     } catch {
-      // Ignore localStorage access failures in privacy mode
+      // Storage fallback
     }
     return defaultTheme;
   });
@@ -105,7 +105,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
     try {
       localStorage.setItem(storageKey, newTheme);
     } catch {
-      // Ignore storage errors
+      // Storage fallback
     }
   };
 

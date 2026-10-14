@@ -35,7 +35,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({ onScanSuccess, onCancel })
           (decodedText) => {
             if (!isMounted) return;
 
-            // Extract code if it's a URL like https://domain.com/?pair=SP-XXXXXX
+            // Parse pair param
             let extractedCode = decodedText.trim();
             if (extractedCode.includes('pair=')) {
               try {
@@ -43,13 +43,13 @@ export const QRScanner: React.FC<QRScannerProps> = ({ onScanSuccess, onCancel })
                 const p = url.searchParams.get('pair');
                 if (p) extractedCode = p;
               } catch {
-                // Ignore parse error, use regex fallback
+                // Regex fallback
                 const match = extractedCode.match(/pair=([A-Za-z0-9\-]+)/);
                 if (match && match[1]) extractedCode = match[1];
               }
             }
 
-            // Stop scanner once recognized
+            // Stop scanner
             if (scannerRef.current) {
               scannerRef.current
                 .stop()
@@ -64,7 +64,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({ onScanSuccess, onCancel })
             }
           },
           () => {
-            // Frame scan miss, normal behavior
+            // Frame miss
           }
         );
 

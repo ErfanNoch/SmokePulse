@@ -73,7 +73,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
   const [newUsername, setNewUsername] = useState('');
   const [showNewUserForm, setShowNewUserForm] = useState(false);
 
-  // Danger reset confirmation
+  // Reset confirm
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   if (!isOpen) return null;

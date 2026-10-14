@@ -32,7 +32,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenP2PSync,
   p2pStatus,
 }) => {
-  // Easter egg: 3 rapid clicks within 600ms window
+  // Easter egg
   const clickCountRef = useRef(0);
   const lastClickTimeRef = useRef(0);
 

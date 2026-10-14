@@ -28,7 +28,7 @@ export function useP2PSync({
   const [syncStats, setSyncStats] = useState<{ logsSynced: number; packsSynced: number } | null>(null);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
-  // Keep fresh references for incoming async socket handlers
+  // State refs
   const logsRef = useRef(logs);
   logsRef.current = logs;
   const packsRef = useRef(packs);
@@ -38,12 +38,12 @@ export function useP2PSync({
   const activeProfileRef = useRef(activeProfile);
   activeProfileRef.current = activeProfile;
 
-  // Handle incoming P2P message
+  // Message handler
   const handleMessage = useCallback(
     async (msg: P2PMessage) => {
       switch (msg.type) {
         case 'SYNC_REQUEST': {
-          // Remote peer requested our payload
+          // Sync request
           const payload = await storageManager.generateSyncPayload(msg.sinceTimestamp || 0);
           peerService.send({
             type: 'SYNC_PAYLOAD',
@@ -55,7 +55,7 @@ export function useP2PSync({
         case 'SYNC_PAYLOAD': {
           setIsSyncing(true);
           try {
-            // Apply pure CRDT merge
+            // CRDT merge
             const currentData = {
               profiles: profilesRef.current,
               logs: logsRef.current,
@@ -63,10 +63,10 @@ export function useP2PSync({
             };
             const result = CRDTEngine.mergePayload(currentData, msg.payload);
 
-            // Persist merged data to Dexie
+            // Persist
             await storageManager.saveAll(result.mergedProfiles, result.mergedLogs, result.mergedPacks);
 
-            // Notify React UI
+            // UI update
             onDataMerged({
               profiles: result.mergedProfiles,
               logs: result.mergedLogs,
@@ -79,7 +79,7 @@ export function useP2PSync({
               packsSynced: result.stats.packsAdded + result.stats.packsUpdated,
             });
 
-            // Send acknowledge back
+            // Ack
             peerService.send({
               type: 'SYNC_ACK',
               itemsReceived: (msg.payload.logs?.length || 0) + (msg.payload.packs?.length || 0),
@@ -100,7 +100,7 @@ export function useP2PSync({
         }
 
         case 'LIVE_LOG': {
-          // Realtime live stick logged on other device
+          // Live log
           const currentLogs = logsRef.current;
           const { merged, added, updated } = CRDTEngine.mergeLogs(currentLogs, [msg.log]);
           if (added > 0 || updated > 0) {
@@ -116,7 +116,7 @@ export function useP2PSync({
         }
 
         case 'LIVE_PACK': {
-          // Realtime live pack purchased on other device
+          // Live pack
           const currentPacks = packsRef.current;
           const { merged, added, updated } = CRDTEngine.mergePacks(currentPacks, [msg.pack]);
           if (added > 0 || updated > 0) {
@@ -135,7 +135,7 @@ export function useP2PSync({
     [onDataMerged]
   );
 
-  // Bind PeerService callbacks
+  // Callbacks
   useEffect(() => {
     peerService.setCallbacks({
       onStatusChange: (newStatus, err) => {
@@ -145,7 +145,7 @@ export function useP2PSync({
       },
       onPeerConnected: (info) => {
         setPeerInfo(info);
-        // Automatically request handshake sync upon connection
+        // Handshake
         peerService.send({
           type: 'HELLO',
           deviceId: 'sp_device',
@@ -153,7 +153,7 @@ export function useP2PSync({
           appVersion: 3,
           timestamp: Date.now(),
         });
-        // Auto trigger initial delta sync
+        // Delta sync
         peerService.send({
           type: 'SYNC_REQUEST',
           sinceTimestamp: 0,
@@ -166,7 +166,7 @@ export function useP2PSync({
     });
 
     return () => {
-      // Don't kill host unless unmounting or explicitly requested
+      // Keepalive
     };
   }, [handleMessage]);
 

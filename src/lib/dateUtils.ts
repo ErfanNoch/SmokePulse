@@ -127,7 +127,7 @@ export function generateMonthGrid(
 
   const cells: CalendarDayCell[] = [];
 
-  // Previous month padding
+  // Prev month
   const prevMonthLastDay = new Date(year, month, 0).getDate();
   for (let i = startDayOfWeek - 1; i >= 0; i--) {
     const d = new Date(year, month - 1, prevMonthLastDay - i);
@@ -149,7 +149,7 @@ export function generateMonthGrid(
     });
   }
 
-  // Current month days
+  // Current month
   for (let day = 1; day <= totalDays; day++) {
     const d = new Date(year, month, day);
     const dateStr = getLocalDateKey(d.getTime());
@@ -170,7 +170,7 @@ export function generateMonthGrid(
     });
   }
 
-  // Trailing next month padding
+  // Next month
   const remaining = (7 - (cells.length % 7)) % 7;
   for (let i = 1; i <= remaining; i++) {
     const d = new Date(year, month + 1, i);

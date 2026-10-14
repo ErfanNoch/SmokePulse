@@ -1,6 +1,0 @@
-{
-  "name": "SmokePulse - Habit & Expense Tracker",
-  "description": "Offline-first smoking tracker with interactive calendar, habit analytics, pack inventory, expense trends, and daily limit controls.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}

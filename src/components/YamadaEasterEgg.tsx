@@ -21,7 +21,7 @@ export const YamadaEasterEgg: React.FC<YamadaEasterEggProps> = ({ isOpen, onClos
       setCanClose(true);
     }, 400);
 
-    // Auto-dismiss after 6 seconds
+    // Auto-dismiss
     const autoCloseTimer = setTimeout(() => {
       onClose();
     }, 6000);
@@ -49,11 +49,10 @@ export const YamadaEasterEgg: React.FC<YamadaEasterEggProps> = ({ isOpen, onClos
 
   return (
     <AnimatePresence>
-      {/* Backdrop: Clicking outside does NOT close the modal */}
+      {/* Modal backdrop */}
       <div
         className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs select-none"
         onClick={(e) => {
-          // Explicitly prevent closing when clicking backdrop/outside
           e.stopPropagation();
         }}
       >

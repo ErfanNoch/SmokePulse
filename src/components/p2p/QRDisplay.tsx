@@ -10,7 +10,7 @@ interface QRDisplayProps {
 export const QRDisplay: React.FC<QRDisplayProps> = ({ code, size = 180 }) => {
   const [copied, setCopied] = useState(false);
 
-  // Encode direct pairing URL or code
+  // Pairing URL
   const pairingPayload = typeof window !== 'undefined'
     ? `${window.location.origin}?pair=${code}`
     : code;
@@ -23,7 +23,7 @@ export const QRDisplay: React.FC<QRDisplayProps> = ({ code, size = 180 }) => {
 
   return (
     <div className="flex flex-col items-center">
-      {/* High contrast QR box */}
+      {/* QR code */}
       <div className="p-3 bg-white rounded-2xl shadow-sm border border-stone-200 dark:border-neutral-700">
         <QRCodeSVG
           value={pairingPayload}
@@ -34,7 +34,7 @@ export const QRDisplay: React.FC<QRDisplayProps> = ({ code, size = 180 }) => {
         />
       </div>
 
-      {/* Code pills & copy */}
+      {/* Code display */}
       <div className="mt-3 flex items-center gap-2">
         <div className="px-3.5 py-1.5 rounded-xl bg-stone-100 dark:bg-neutral-800 border border-stone-200 dark:border-neutral-700 font-mono text-base font-bold tracking-widest text-stone-900 dark:text-white select-all">
           {code}

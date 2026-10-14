@@ -182,19 +182,19 @@ class DexieStorageManager {
 
     this.initPromise = (async () => {
       try {
-        // Request persistent storage in browser to avoid eviction
+        // Storage persistence
         db.requestPersistence().catch(() => {});
 
-        // Check if Dexie already has records
+        // Data check
         const profileCount = await db.profiles.count();
         if (profileCount === 0) {
-          // Check for legacy data to migrate
+          // Migration check
           const legacyData = await this.readLegacyData();
           if (legacyData && legacyData.profiles.length > 0) {
             await this.saveAll(legacyData.profiles, legacyData.logs, legacyData.packs);
             console.log('Successfully migrated legacy data to Dexie.js');
           } else {
-            // Seed default
+            // Seed data
             const defaultProf = { ...DEFAULT_PROFILE };
             const seed = generateSeedData(defaultProf);
             await this.saveAll([defaultProf], seed.logs, seed.packs);
@@ -300,7 +300,7 @@ class DexieStorageManager {
       db.packs.filter((p) => !p.isDeleted).toArray(),
     ]);
 
-    // Active profile selection
+    // Active profile
     let activeProfileId: string | null = null;
     if (typeof window !== 'undefined') {
       activeProfileId = localStorage.getItem(ACTIVE_PROFILE_KEY);
@@ -311,7 +311,7 @@ class DexieStorageManager {
     rawLogs.sort((a, b) => b.timestamp - a.timestamp);
     rawPacks.sort((a, b) => b.timestamp - a.timestamp);
 
-    // Keep localStorage backup as quick snapshot
+    // Local snapshot
     this.saveQuickLocalStorageSnapshot(profiles, rawLogs, rawPacks);
 
     return {
@@ -339,7 +339,7 @@ class DexieStorageManager {
         })
       );
     } catch {
-      // quota safeguard
+      // Quota safeguard
     }
   }
 
@@ -350,7 +350,7 @@ class DexieStorageManager {
   ): Promise<void> {
     const now = Date.now();
 
-    // Assign updatedAt to ensure CRDT LWW sync readiness
+    // Sync timestamps (CRDT LWW)
     const normalizedLogs = logs.map((l) => ({
       ...l,
       updatedAt: l.updatedAt || l.timestamp || now,

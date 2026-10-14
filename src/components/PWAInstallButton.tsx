@@ -11,7 +11,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'c
   const [showIOSGuide, setShowIOSGuide] = useState(false);
   const [isInstalling, setIsInstalling] = useState(false);
 
-  // If already running as an installed PWA, hide the button
+  // Standalone guard
   if (isInstalled) {
     return null;
   }
@@ -22,7 +22,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'c
     setIsInstalling(false);
   };
 
-  // Chromium / Android / Desktop flow
+  // Chromium / Desktop
   if (isInstallable) {
     if (variant === 'banner') {
       return (

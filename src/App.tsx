@@ -51,13 +51,13 @@ export default function App() {
   const [packs, setPacks] = useState<PackPurchase[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Easter Egg modal state
+  // Easter egg
   const [isYamadaOpen, setIsYamadaOpen] = useState(false);
 
-  // P2P Multi-device Sync modal state
+  // P2P modal
   const [isP2PModalOpen, setIsP2PModalOpen] = useState(false);
 
-  // P2P WebRTC State Manager with CRDT Sync
+  // P2P sync
   const p2p = useP2PSync({
     activeProfile,
     profiles,
@@ -70,7 +70,7 @@ export default function App() {
     },
   });
 
-  // Automatically open and connect if URL contains ?pair=
+  // URL pairing
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
@@ -82,7 +82,7 @@ export default function App() {
     }
   }, []);
 
-  // Navigation & modals
+  // Navigation
   const [activeTab, setActiveTab] = useState<'dashboard' | 'calendar' | 'habits' | 'wallet'>('dashboard');
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
   const [logModalInitialDate, setLogModalInitialDate] = useState<Date | undefined>(undefined);
@@ -90,15 +90,15 @@ export default function App() {
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const [isCalibrateModalOpen, setIsCalibrateModalOpen] = useState(false);
 
-  // Calendar day detail modal
+  // Day details
   const [selectedDaySummary, setSelectedDaySummary] = useState<DailySummary | null>(null);
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date | null>(null);
   const [isDayDetailsOpen, setIsDayDetailsOpen] = useState(false);
 
-  // Security Lock
+  // PIN lock
   const [isLocked, setIsLocked] = useState(false);
 
-  // Load database on mount
+  // Init DB
   useEffect(() => {
     async function loadData() {
       try {
@@ -120,11 +120,11 @@ export default function App() {
     loadData();
   }, []);
 
-  // Inventory calculation
+  // Inventory
   const inventory = calculateLiveInventory(activeProfile, packs, logs);
   const costPerStick = getCostPerStick(activeProfile, packs);
 
-  // Persist helper
+  // Storage
   const persistChanges = useCallback(
     async (
       updatedProfiles: UserProfile[],
@@ -139,7 +139,7 @@ export default function App() {
     []
   );
 
-  // Quick log +1 stick with instant tactile sound
+  // Quick log
   const handleQuickLogStick = () => {
     sound.playClick(activeProfile.soundFeedback);
     const newLog: CigaretteLog = {
@@ -155,7 +155,7 @@ export default function App() {
     p2p.broadcastLiveLog(newLog);
   };
 
-  // Detailed log save
+  // Detailed log
   const handleSaveDetailedLog = (logData: Omit<CigaretteLog, 'id'>) => {
     sound.playClick(activeProfile.soundFeedback);
     const newLog: CigaretteLog = {
@@ -185,7 +185,7 @@ export default function App() {
     }
   };
 
-  // Record pack purchase
+  // Pack purchase
   const handleSavePackPurchase = (packData: Omit<PackPurchase, 'id'>) => {
     sound.playSuccess(activeProfile.soundFeedback);
     const newPack: PackPurchase = {
@@ -198,7 +198,7 @@ export default function App() {
     p2p.broadcastLivePack(newPack);
   };
 
-  // Calibrate physical stock
+  // Stock calibration
   const handleCalibrateStock = (newPhysicalCount: number) => {
     sound.playClick(activeProfile.soundFeedback);
     const packSize = activeProfile.defaultPackSize || 20;
@@ -217,7 +217,7 @@ export default function App() {
     handleUpdateProfile(updatedProfile);
   };
 
-  // Delete cigarette log
+  // Delete log
   const handleDeleteLog = (id: string) => {
     const updated = logs.filter((l) => l.id !== id);
     persistChanges(profiles, updated, packs);
@@ -236,7 +236,7 @@ export default function App() {
     }
   };
 
-  // Delete pack record
+  // Delete pack
   const handleDeletePack = (id: string) => {
     const updated = packs.filter((p) => p.id !== id);
     persistChanges(profiles, logs, updated);
@@ -253,7 +253,7 @@ export default function App() {
     }
   };
 
-  // Reset all data
+  // Reset data
   const handleResetAllData = async () => {
     const fresh = await storageManager.clearAllData();
     setProfiles(fresh.profiles);
@@ -265,7 +265,7 @@ export default function App() {
     sound.playSuccess(true);
   };
 
-  // Profile management
+  // Profiles
   const handleSelectProfile = (id: string) => {
     const target = profiles.find((p) => p.id === id);
     if (target) {
@@ -319,7 +319,7 @@ export default function App() {
     }
   };
 
-  // Calendar selection
+  // Calendar
   const handleSelectCalendarDate = (date: Date, summary: DailySummary | null) => {
     setSelectedCalendarDate(date);
     setSelectedDaySummary(summary);
@@ -331,7 +331,7 @@ export default function App() {
     setIsLogModalOpen(true);
   };
 
-  // Calculate today's sticks
+  // Daily count
   const todayKey = getLocalDateKey(Date.now());
   const todayLogs = logs.filter((l) => getLocalDateKey(l.timestamp) === todayKey);
   const todayCount = todayLogs.reduce((acc, l) => acc + l.count, 0);

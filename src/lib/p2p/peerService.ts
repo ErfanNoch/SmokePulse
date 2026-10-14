@@ -91,7 +91,7 @@ export class PeerService {
         peer.on('error', (err) => {
           console.warn('PeerJS Host Error:', err);
           if (err.type === 'unavailable-id') {
-            // Retry with randomized code if ID is collision
+            // Collision retry
             this.initAsHost().then(resolve).catch(reject);
             return;
           }
@@ -100,7 +100,7 @@ export class PeerService {
         });
 
         peer.on('disconnected', () => {
-          // Reconnect to signaling server if disconnected
+          // Reconnect
           if (this.peer && !this.peer.destroyed) {
             this.peer.reconnect();
           }
@@ -159,7 +159,7 @@ export class PeerService {
 
   private handleIncomingConnection(conn: DataConnection) {
     if (this.connection && this.connection.open) {
-      // Already connected to a peer, close extra
+      // Reject duplicate
       conn.close();
       return;
     }
@@ -180,7 +180,7 @@ export class PeerService {
       this.callbacks?.onStatusChange('connected');
       this.callbacks?.onPeerConnected(this.remotePeerInfo);
 
-      // Start ping loop
+      // Heartbeat
       this.startHeartbeat();
     });
 

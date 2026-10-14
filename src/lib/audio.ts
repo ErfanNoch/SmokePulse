@@ -1,4 +1,4 @@
-// Lightweight Web Audio API synthesizer for tactile clicks and feedback
+// Web Audio Synthesizer
 class SoundSynthesizer {
   private audioCtx: AudioContext | null = null;
 
@@ -16,7 +16,7 @@ class SoundSynthesizer {
     return this.audioCtx;
   }
 
-  // Quick tactile tick for cigarette log
+  // Click feedback
   public playClick(enabled = true) {
     if (!enabled) return;
     try {
@@ -38,11 +38,11 @@ class SoundSynthesizer {
       osc.start();
       osc.stop(ctx.currentTime + 0.05);
     } catch {
-      // Audio might be blocked by browser policy prior to user interaction
+      // Autoplay fallback
     }
   }
 
-  // Gentle chime for pack purchase or successful action
+  // Success chime
   public playSuccess(enabled = true) {
     if (!enabled) return;
     try {
@@ -67,11 +67,11 @@ class SoundSynthesizer {
         osc.stop(now + i * 0.08 + 0.15);
       });
     } catch {
-      // Ignore
+      // Autoplay fallback
     }
   }
 
-  // Warning tone if approaching or exceeding daily limit
+  // Warning tone
   public playWarning(enabled = true) {
     if (!enabled) return;
     try {
@@ -95,7 +95,7 @@ class SoundSynthesizer {
       osc.start(now);
       osc.stop(now + 0.12);
     } catch {
-      // Ignore
+      // Autoplay fallback
     }
   }
 }
